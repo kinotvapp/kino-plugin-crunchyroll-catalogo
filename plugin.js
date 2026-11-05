@@ -768,10 +768,12 @@ function shell({ route, body, every }) {
       { type: "IconButton", key: "barSettings", icon: "settings", ...tw("tabSettings", "labelText"), ...tw("tabSettings", "tooltip"), onPressed: { event: "tab", arg: "settings" } }
     ];
   }
+  const banner = body && body.key === "titleBody" && Array.isArray(body.children) && body.children[0] && body.children[0].type === "heroCard" ? body.children[0] : null;
+  const rest = banner ? { ...body, children: body.children.slice(1) } : body;
   const page = {
     type: "SingleChildScrollView",
     key: "page-" + route,
-    children: [{ type: "Column", key: "body-" + route, padding: PAGE_PADDING, gap: 16, children: [body] }]
+    children: [...banner ? [banner] : [], { type: "Column", key: "body-" + route, padding: PAGE_PADDING, gap: 16, children: [rest] }]
   };
   const root = { type: "Scaffold", key: "app", appBar, body: page };
   return every ? { ...root, every } : root;
