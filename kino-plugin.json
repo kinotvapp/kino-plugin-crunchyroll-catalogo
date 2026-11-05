@@ -1,0 +1,133 @@
+{
+  "id": "crunchyroll-catalogo",
+  "name": "Crunchyroll Catálogo",
+  "version": "0.1.0",
+  "apiVersion": 23,
+  "entry": "plugin.js",
+  "description": "El catálogo de Crunchyroll: anime, doramas y más. Solo muestra títulos, no reproduce.",
+  "author": "kinotvapp",
+  "icon": "icon.png",
+  "theme": {
+    "accent": "#F47521",
+    "onAccent": "#1A0D04",
+    "background": "#201209",
+    "surface": "#3A2010",
+    "highlight": "#FFD2B0"
+  },
+  "categories": [
+    "series",
+    "movies"
+  ],
+  "hosts": [
+    "www.crunchyroll.com",
+    "imgsrv.crunchyroll.com"
+  ],
+  "secrets": {
+    "CRUNCHYROLL_CLIENT_ID": "kino-sealed:v1:bXlLDTCDfqaY5L2sfiLttc0ha2uFdZ7LWi4uSfY4cUVxcBG7ec23AQRgeQsJNRo93Eb3kt8bR_sK6UXMBti5hxGAcXgy9zRqERzIbdpD46I",
+    "CRUNCHYROLL_CLIENT_SECRET": "kino-sealed:v1:kR8vSHhoAx3JkXX1hcno-xXEP3bfqyHYMUPYQUzpqiL8U83Dzih_SHSrVAWtET4emurdwbftU59FSYaDoXatjvRnbe3RtPUBL1r5NT8bMcGCERhPX44L7MfQmDw"
+  },
+  "catalogOnly": true,
+  "capabilities": [
+    "home",
+    "browse",
+    "search",
+    "episodes",
+    "screen",
+    "catalog",
+    "schedule",
+    "notifications",
+    "shared",
+    "library"
+  ],
+  "screen": {
+    "label": "Crunchyroll",
+    "labelEn": "Crunchyroll",
+    "icon": "tv",
+    "menuOpens": "screen",
+    "opensFrom": [
+      "menu",
+      "settings"
+    ],
+    "settingsIn": "both"
+  },
+  "jobs": [
+    {
+      "id": "episodes",
+      "label": {
+        "es": "Avisar de capítulos nuevos",
+        "en": "Tell me about new episodes"
+      },
+      "everyMin": 360,
+      "everyOptions": [
+        60,
+        180,
+        360,
+        720,
+        1440
+      ],
+      "runOn": "preferPhone"
+    }
+  ],
+  "settings": [
+    {
+      "key": "locale",
+      "label": "Idioma del catálogo",
+      "labelEn": "Catalog language",
+      "type": "select",
+      "default": "auto",
+      "options": [
+        {
+          "value": "auto",
+          "label": "Automático (según el aparato)",
+          "labelEn": "Automatic (from this device)"
+        },
+        {
+          "value": "es-419",
+          "label": "Español",
+          "labelEn": "Spanish"
+        },
+        {
+          "value": "en-US",
+          "label": "Inglés",
+          "labelEn": "English"
+        },
+        {
+          "value": "pt-BR",
+          "label": "Portugués",
+          "labelEn": "Portuguese"
+        }
+      ]
+    },
+    {
+      "key": "kinds",
+      "label": "Qué mostrar",
+      "labelEn": "What to show",
+      "type": "select",
+      "default": "both",
+      "options": [
+        {
+          "value": "both",
+          "label": "Series y películas",
+          "labelEn": "Series and movies"
+        },
+        {
+          "value": "series",
+          "label": "Solo series",
+          "labelEn": "Series only"
+        },
+        {
+          "value": "movie",
+          "label": "Solo películas",
+          "labelEn": "Movies only"
+        }
+      ]
+    },
+    {
+      "key": "homeRows",
+      "label": "Filas en el Inicio de Kino",
+      "labelEn": "Rows on Kino's Home",
+      "type": "toggle",
+      "default": true
+    }
+  ]
+}

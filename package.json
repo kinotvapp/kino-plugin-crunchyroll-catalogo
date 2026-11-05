@@ -1,0 +1,16 @@
+{
+  "name": "kino-plugin-crunchyroll-catalogo",
+  "private": true,
+  "type": "module",
+  "description": "Crunchyroll Catálogo: Crunchyroll's catalog in Kino, without an account and without playback. Its source lives in src/, and `npm run build` bundles it into the shipped plugin.js.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check:built": "node scripts/build.mjs --check",
+    "test": "node --test test/*.test.mjs",
+    "validate": "node ../sdk/validate.mjs ."
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  }
+}
