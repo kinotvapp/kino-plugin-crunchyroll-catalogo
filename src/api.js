@@ -26,12 +26,12 @@ function getToken() {
 
 async function fetchToken() {
   if (Date.now() < _tokenFailedUntil) throw unavailable("Crunchyroll refused the anonymous token a moment ago");
-  const id = kino.secret("CRUNCHYROLL_CLIENT_ID");
-  const secret = kino.secret("CRUNCHYROLL_CLIENT_SECRET");
+  // kino.secret() is a marker Kino swaps for the value inside kino.fetch, as text: the sealed value is already the
+  // base64 of "client_id:client_secret", so the marker must reach the header untouched (never through btoa).
   const resp = await kino.fetch(`${BASE}/auth/v1/token`, {
     method: "POST",
     headers: {
-      "Authorization": `Basic ${btoa(`${id}:${secret}`)}`,
+      "Authorization": `Basic ${kino.secret("CRUNCHYROLL_BASIC")}`,
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": UA,
     },
@@ -44,6 +44,7 @@ async function fetchToken() {
   if (!data || typeof data.access_token !== "string" || !data.access_token) {
     _token = null;
     _tokenFailedUntil = Date.now() + TOKEN_RETRY_MS;
+    kino.log(`token refused: HTTP ${resp.status}${resp.ok ? " (no access_token)" : ""}`);
     throw unavailable(`Crunchyroll token: HTTP ${resp.status}`);
   }
   _token = data.access_token;
@@ -77,7 +78,10 @@ async function _get(path, params = {}) {
     resp = await kino.fetch(url.toString(), { headers: authHeaders() });
   }
   if (resp.status === 404) throw kino.error("not_found", `Crunchyroll: ${path} not found`);
-  if (!resp.ok) throw unavailable(`Crunchyroll: HTTP ${resp.status} for ${path}`);
+  if (!resp.ok) {
+    kino.log(`request failed: HTTP ${resp.status} for ${path.replace(/[A-Z0-9]{8,}/g, ":id")}`);
+    throw unavailable(`Crunchyroll: HTTP ${resp.status} for ${path}`);
+  }
   try {
     return await resp.json();
   } catch {
