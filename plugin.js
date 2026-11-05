@@ -929,10 +929,10 @@ function episodeLine(f) {
 function followCard(f) {
   const id = f.crId;
   const isNew = !!(f.latest && !f.ackedAt);
-  const actions2 = [];
-  if (isNew) actions2.push({ type: "Button", variant: "secondary", key: `seen-${id}`, icon: "check", ...tw("markSeen", "labelText"), onPressed: { event: "followMarkSeen", arg: id } });
-  actions2.push({ type: "TextButton", key: `open-${id}`, icon: "info", ...tw("openTitle", "labelText"), onPressed: { event: "openTitle", arg: refOf("series", id) } });
-  actions2.push({
+  const actions = [];
+  if (isNew) actions.push({ type: "Button", variant: "secondary", key: `seen-${id}`, icon: "check", ...tw("markSeen", "labelText"), onPressed: { event: "followMarkSeen", arg: id } });
+  actions.push({ type: "TextButton", key: `open-${id}`, icon: "info", ...tw("openTitle", "labelText"), onPressed: { event: "openTitle", arg: refOf("series", id) } });
+  actions.push({
     type: "TextButton",
     key: `unfollow-${id}`,
     icon: "close",
@@ -957,7 +957,7 @@ function followCard(f) {
           ...isNew ? [{ type: "Badge", key: `new-${id}`, ...tw("newMark") }] : []
         ] },
         { type: "Text", style: "caption", color: "muted", ...episodeLine(f) },
-        { type: "Row", key: `followActions-${id}`, wrap: true, gap: 8, children: actions2 }
+        { type: "Row", key: `followActions-${id}`, wrap: true, gap: 8, children: actions }
       ] }
     ]
   };
@@ -1026,11 +1026,20 @@ function whereGo(item, tmdbId) {
   if (tmdbId) return { titleByIds: { tmdb: tmdbId, kind: item.kind, title, ...item.year ? { year: Number(item.year) } : {} } };
   return { search: { q: title.slice(0, 200), scope: "all" } };
 }
-function hero(item) {
-  const children = [];
-  if (item.backdrop) children.push({ type: "Image", key: "tbackdrop", url: item.backdrop, aspect: "16:9", fit: "cover", focus: "top", ...same(item.title, "alt") });
-  children.push({ type: "Text", key: "ttitle", style: "h2", ...same(item.title) });
-  return { type: "Column", key: "thero", gap: 12, children };
+var LEAD_MAX = 140;
+function hero(item, buttons) {
+  const overview = typeof item.overview === "string" ? item.overview.trim() : "";
+  const lead = overview.length <= LEAD_MAX ? overview : `${overview.slice(0, LEAD_MAX - 1).trimEnd()}…`;
+  return {
+    type: "heroCard",
+    key: "thero",
+    h: { compact: 240, expanded: 320 },
+    title: String(item.title),
+    titleEn: String(item.title),
+    ...lead ? same(lead) : {},
+    ...item.backdrop ? { image: item.backdrop } : {},
+    buttons
+  };
 }
 function facts(item, seasonCount) {
   const parts = [];
@@ -1040,15 +1049,15 @@ function facts(item, seasonCount) {
     parts.push([t2.text, t2.textEn]);
   }
   if (!parts.length) return null;
-  return { type: "Text", key: "tfacts", color: "muted", text: parts.map((p) => p[0]).join(" · "), textEn: parts.map((p) => p[1]).join(" · ") };
+  return { type: "Text", key: "tfacts", style: "h4", text: parts.map((p) => p[0]).join("  ·  "), textEn: parts.map((p) => p[1]).join("  ·  ") };
 }
-function actions(item, crId, tmdbId) {
+function heroButtons(item, crId, tmdbId) {
   const buttons = [{ type: "ElevatedButton", key: "twhere", icon: "search", autofocus: true, ...tw("findWhere", "labelText"), onPressed: { go: whereGo(item, tmdbId) } }];
   if (item.kind === "series") {
     const arg = JSON.stringify({ crId, name: String(item.title).slice(0, 120), ...item.poster ? { poster: item.poster } : {} });
-    buttons.push(isFollowing(crId) ? { type: "Button", variant: "secondary", key: "tunfollow", icon: "check", ...tw("unfollow", "labelText"), onPressed: { event: "titleUnfollow", arg } } : { type: "Button", variant: "secondary", key: "tfollow", icon: "add", ...tw("follow", "labelText"), onPressed: { event: "titleFollow", arg } });
+    buttons.push(isFollowing(crId) ? { type: "TextButton", key: "tunfollow", icon: "check", ...tw("unfollow", "labelText"), onPressed: { event: "titleUnfollow", arg } } : { type: "TextButton", key: "tfollow", icon: "add", ...tw("follow", "labelText"), onPressed: { event: "titleFollow", arg } });
   }
-  return { type: "Row", key: "tactions", wrap: true, gap: 12, children: buttons };
+  return buttons;
 }
 function seasonsBlock(seasons, value) {
   return {
@@ -1063,21 +1072,29 @@ function seasonsBlock(seasons, value) {
 }
 function episodeRow(e, i) {
   const n = e.number ?? i + 1;
-  const titleOf = e.title ? { title: `${n}. ${e.title}`, titleEn: `${n}. ${e.title}` } : tw("episode", "title", n);
+  const titleOf = e.title ? { text: `${n}. ${e.title}`, textEn: `${n}. ${e.title}` } : tw("episode", "text", n);
   const parts = [];
   if (e.airDate) parts.push([e.airDate, e.airDate]);
   if (e.runtimeMinutes) {
     const r = tw("episodeRuntime", "text", e.runtimeMinutes);
     parts.push([r.text, r.textEn]);
   }
+  const overview = typeof e.overview === "string" ? e.overview.trim().slice(0, 110) : "";
   return {
-    type: "ListTile",
+    type: "Row",
     key: "te-" + i,
-    dense: true,
-    ...titleOf,
-    ...parts.length ? { subtitle: parts.map((p) => p[0]).join(" · "), subtitleEn: parts.map((p) => p[1]).join(" · ") } : {},
-    ...e.premium ? { trailing: { type: "Badge", ...tw("premiumBadge") } } : {},
-    canRequestFocus: true
+    gap: 12,
+    crossAxisAlignment: "center",
+    canRequestFocus: true,
+    children: [
+      { type: "Image", key: "tei-" + i, width: 120, aspect: "16:9", fit: "cover", ...e.still ? { url: e.still } : {}, fallback: { type: "Skeleton", shape: "block", height: 64 } },
+      { type: "Column", flex: 1, gap: 4, children: [
+        { type: "Text", bold: true, maxLines: 2, ...titleOf },
+        ...parts.length ? [{ type: "Text", style: "caption", color: "muted", text: parts.map((p) => p[0]).join(" · "), textEn: parts.map((p) => p[1]).join(" · ") }] : [],
+        ...overview ? [{ type: "Text", style: "caption", color: "muted", maxLines: 2, ...same(overview) }] : [],
+        ...e.premium ? [{ type: "Badge", ...tw("premiumBadge") }] : []
+      ] }
+    ]
   };
 }
 function episodesBlock(list2, { failed, all }) {
@@ -1144,10 +1161,9 @@ async function fichaBody({ ref, state = {} } = {}) {
     tmdbIdOf(item),
     season ? api.episodes(season.id, locale).then((list2) => ({ list: list2 }), () => ({ list: [], failed: true })) : Promise.resolve(null)
   ]);
-  const parts = [hero(item)];
+  const parts = [hero(item, heroButtons(item, r.crId, tmdbId))];
   const f = facts(item, seasons.length);
   if (f) parts.push(f);
-  parts.push(actions(item, r.crId, tmdbId));
   if (item.genres?.length) parts.push({ type: "Row", key: "tgenres", wrap: true, gap: 8, children: item.genres.map((g, i) => ({ type: "Badge", key: "tg-" + i, ...same(g) })) });
   if (item.overview) parts.push({ type: "Column", key: "toverview", gap: 8, children: [sectionTitle("overview"), { type: "Text", canRequestFocus: true, ...same(item.overview.slice(0, 2e3)) }] });
   if (seasons.length > 1) parts.push(seasonsBlock(seasons, season.id));

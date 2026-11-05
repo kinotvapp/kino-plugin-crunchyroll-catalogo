@@ -1,7 +1,7 @@
 {
   "id": "crunchyroll-catalogo",
   "name": "Crunchyroll Catálogo",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "apiVersion": 23,
   "entry": "plugin.js",
   "description": "El catálogo de Crunchyroll: anime, doramas y más. Solo muestra títulos, no reproduce.",
