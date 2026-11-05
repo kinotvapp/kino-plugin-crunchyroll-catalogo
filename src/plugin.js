@@ -28,19 +28,19 @@ export async function search(query) {
   return searchItems(kino.config, query);
 }
 
-/** The episodes of a series, every season (one per number); a movie has none. */
+/** The episodes of a series, every numbered season (Kino reads 1..999: specials, season 0, stay on the title page). */
 export async function episodes(ref) {
   const r = parseRef(ref);
   if (!r) throw kino.error("not_found", "Unknown ref: " + ref);
   if (r.kind === "movie") return { episodes: [] };
   const locale = contentLocale(kino.config);
-  const seasons = await seasonsOf(r.crId, locale);
+  const seasons = (await seasonsOf(r.crId, locale)).filter((s) => s.number >= 1 && s.number <= 999);
   const lists = await Promise.all(seasons.map((s) => api.episodes(s.id, locale).catch(() => [])));
   const episodes = [];
   seasons.forEach((s, i) => {
     for (const ep of lists[i]) {
       const e = mapEpisode(ep);
-      if (!Number.isInteger(e.number)) continue;
+      if (!Number.isInteger(e.number) || e.number < 1) continue;
       episodes.push({ ...e, season: s.number });
     }
   });

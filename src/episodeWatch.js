@@ -11,6 +11,7 @@ import { list, updateMany } from "./follows.js";
 import { SCREEN_TEXT, t, tl } from "./i18n.js";
 import { contentLocale } from "./config.js";
 import { refOf } from "./map.js";
+import { pickSeasons } from "./seasons.js";
 
 export const MAX_PER_RUN = 4;
 const CURSOR_KEY = "crEpCursor";
@@ -27,6 +28,21 @@ function readCursor(n) {
 }
 
 const localeOf = () => contentLocale(kino.config);
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * [ep] with the day it aired as `air_date` ("2024-01-07"; CR answers ISO datetimes such as "2024-01-07T00:00:00+09:00",
+ * in `episode_air_date` or `air_date`) and whole season and episode numbers, or null when any is missing.
+ */
+function asAired(ep, seasonNumber) {
+  if (!ep || typeof ep !== "object") return null;
+  const day = String(ep.episode_air_date ?? ep.air_date ?? "").slice(0, 10);
+  const number = ep.episode_number;
+  const season = Number.isInteger(ep.season_number) ? ep.season_number : seasonNumber;
+  if (!DAY_RE.test(day) || !Number.isInteger(number) || number < 1 || !Number.isInteger(season)) return null;
+  return { ...ep, air_date: day, season_number: season, episode_number: number };
+}
 
 /** Latest aired episode in `episodes` array (air_date <= today), by max season_number then max episode_number, or null. */
 function latestAired(episodes, today) {
@@ -139,9 +155,8 @@ export async function checkEpisodes(ctx, { today = isoToday() } = {}) {
       continue;
     }
 
-    // Pick the latest season (highest season_number)
-    const latestSeason = seasons.reduce((best, s) =>
-      !best || (s.season_number ?? 0) > (best.season_number ?? 0) ? s : best, null);
+    // The newest season, its original audio (a dub is listed as a season of its own and can lag behind)
+    const latestSeason = pickSeasons(seasons).filter((s) => s.number >= 1).at(-1);
     if (!latestSeason) { save(patches); continue; }
 
     // Fetch episodes of that season
@@ -155,7 +170,7 @@ export async function checkEpisodes(ctx, { today = isoToday() } = {}) {
     }
     if (!Array.isArray(episodes)) { save(patches); continue; }
 
-    const latest = latestAired(episodes, today);
+    const latest = latestAired(episodes.map((ep) => asAired(ep, latestSeason.number)).filter(Boolean), today);
     if (!latest) { save(patches); continue; }
 
     const baseline = { season: latest.season_number, number: latest.episode_number, airDate: latest.air_date };

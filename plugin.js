@@ -241,6 +241,7 @@ var SCREEN_TEXT = {
   close: ["Cerrar", "Close"],
   overview: ["Sinopsis", "Synopsis"],
   season: (n) => [`Temporada ${n}`, `Season ${n}`],
+  specials: ["Especiales", "Specials"],
   episode: (n) => [`Capítulo ${n}`, `Episode ${n}`],
   episodeRuntime: (m) => [`${m} min`, `${m} min`],
   seasonsCount: (n) => [n === 1 ? "1 temporada" : `${n} temporadas`, n === 1 ? "1 season" : `${n} seasons`],
@@ -531,6 +532,24 @@ function updateMany(patches) {
   return changed ? write(current.map((f) => cleanRecord(f) || f)) : false;
 }
 
+// src/seasons.js
+var MAX_SEASONS = 40;
+var numberOf = (s, i) => Number.isInteger(s?.season_number) && s.season_number >= 0 ? s.season_number : Number.isInteger(s?.season_sequence_number) ? s.season_sequence_number : i + 1;
+var rank = (s, original) => s?.audio_locale && s.audio_locale === original ? 0 : s?.is_subbed ? 1 : 2;
+function pickSeasons(raw, originalAudio = "ja-JP") {
+  const byNumber = /* @__PURE__ */ new Map();
+  (Array.isArray(raw) ? raw : []).forEach((s, i) => {
+    if (!s || typeof s.id !== "string" || !s.id) return;
+    const n = numberOf(s, i);
+    const prev = byNumber.get(n);
+    if (!prev || rank(s, originalAudio) < rank(prev.raw, originalAudio)) byNumber.set(n, { raw: s, n });
+  });
+  return [...byNumber.values()].sort((a, b) => a.n - b.n).slice(0, MAX_SEASONS).map(({ raw: s, n }) => ({ id: s.id, number: n, title: typeof s.title === "string" ? s.title : "" }));
+}
+async function seasonsOf(seriesId, locale, originalAudio) {
+  return pickSeasons(await api.seasons(seriesId, locale), originalAudio);
+}
+
 // src/episodeWatch.js
 var MAX_PER_RUN = 4;
 var CURSOR_KEY = "crEpCursor";
@@ -544,6 +563,15 @@ function readCursor(n) {
   return Number.isInteger(c) && c >= 0 && c < n ? c : 0;
 }
 var localeOf = () => contentLocale(kino.config);
+var DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+function asAired(ep, seasonNumber) {
+  if (!ep || typeof ep !== "object") return null;
+  const day = String(ep.episode_air_date ?? ep.air_date ?? "").slice(0, 10);
+  const number = ep.episode_number;
+  const season = Number.isInteger(ep.season_number) ? ep.season_number : seasonNumber;
+  if (!DAY_RE.test(day) || !Number.isInteger(number) || number < 1 || !Number.isInteger(season)) return null;
+  return { ...ep, air_date: day, season_number: season, episode_number: number };
+}
 function latestAired(episodes2, today) {
   let best = null;
   for (const ep of episodes2) {
@@ -624,7 +652,7 @@ async function checkEpisodes(ctx, { today = isoToday() } = {}) {
       save(patches);
       continue;
     }
-    const latestSeason = seasons.reduce((best, s) => !best || (s.season_number ?? 0) > (best.season_number ?? 0) ? s : best, null);
+    const latestSeason = pickSeasons(seasons).filter((s) => s.number >= 1).at(-1);
     if (!latestSeason) {
       save(patches);
       continue;
@@ -641,7 +669,7 @@ async function checkEpisodes(ctx, { today = isoToday() } = {}) {
       save(patches);
       continue;
     }
-    const latest = latestAired(episodes2, today);
+    const latest = latestAired(episodes2.map((ep) => asAired(ep, latestSeason.number)).filter(Boolean), today);
     if (!latest) {
       save(patches);
       continue;
@@ -700,24 +728,6 @@ function newEpisodesRow({ today = isoToday() } = {}) {
       return item;
     })
   };
-}
-
-// src/seasons.js
-var MAX_SEASONS = 40;
-var numberOf = (s, i) => Number.isInteger(s?.season_number) && s.season_number >= 0 ? s.season_number : Number.isInteger(s?.season_sequence_number) ? s.season_sequence_number : i + 1;
-var rank = (s, original) => s?.audio_locale && s.audio_locale === original ? 0 : s?.is_subbed ? 1 : 2;
-function pickSeasons(raw, originalAudio = "ja-JP") {
-  const byNumber = /* @__PURE__ */ new Map();
-  (Array.isArray(raw) ? raw : []).forEach((s, i) => {
-    if (!s || typeof s.id !== "string" || !s.id) return;
-    const n = numberOf(s, i);
-    const prev = byNumber.get(n);
-    if (!prev || rank(s, originalAudio) < rank(prev.raw, originalAudio)) byNumber.set(n, { raw: s, n });
-  });
-  return [...byNumber.values()].sort((a, b) => a.n - b.n).slice(0, MAX_SEASONS).map(({ raw: s, n }) => ({ id: s.id, number: n, title: typeof s.title === "string" ? s.title : "" }));
-}
-async function seasonsOf(seriesId, locale, originalAudio) {
-  return pickSeasons(await api.seasons(seriesId, locale), originalAudio);
 }
 
 // src/screen/logo.js
@@ -1045,7 +1055,7 @@ function seasonsBlock(seasons, value) {
     gap: 8,
     children: [
       sectionTitle("seasons"),
-      { type: "Chips", key: "season", value, onChanged: "titleSeason", options: seasons.map((s) => ({ value: s.id, ...tw("season", "label", s.number) })) }
+      { type: "Chips", key: "season", value, onChanged: "titleSeason", options: seasons.map((s) => ({ value: s.id, ...s.number >= 1 ? tw("season", "label", s.number) : tw("specials", "label") })) }
     ]
   };
 }
@@ -1126,7 +1136,8 @@ async function fichaBody({ ref, state = {} } = {}) {
   }
   const item = isSeries ? mapSeries(raw) : mapMovie(raw);
   const seasons = isSeries ? pickSeasons(seasonsRaw) : [];
-  const season = seasons.find((s) => s.id === state.season) ?? seasons[0] ?? null;
+  const mine = state.title && typeof state.title === "object" && state.title.ref === ref ? state.title : {};
+  const season = seasons.find((s) => s.id === mine.season) ?? seasons.find((s) => s.number >= 1) ?? seasons[0] ?? null;
   const [tmdbId, epResult] = await Promise.all([
     tmdbIdOf(item),
     season ? api.episodes(season.id, locale).then((list2) => ({ list: list2 }), () => ({ list: [], failed: true })) : Promise.resolve(null)
@@ -1140,7 +1151,7 @@ async function fichaBody({ ref, state = {} } = {}) {
   if (seasons.length > 1) parts.push(seasonsBlock(seasons, season.id));
   if (epResult) {
     const list2 = epResult.list.map((ep) => ({ ...mapEpisode(ep), premium: !!ep.is_premium_only })).filter((e) => Number.isInteger(e.number)).sort((a, b) => a.number - b.number);
-    parts.push(episodesBlock(list2, { failed: !!epResult.failed, all: state.all === true }));
+    parts.push(episodesBlock(list2, { failed: !!epResult.failed, all: mine.all === true }));
   }
   const similar = (Array.isArray(similarRaw) ? similarRaw : []).map(mapAny).filter((s) => s && s.ref !== item.ref).slice(0, SIMILAR_MAX);
   if (similar.length) parts.push(similarBlock(similar));
@@ -1151,9 +1162,10 @@ async function fichaBody({ ref, state = {} } = {}) {
 var TAB_ROUTES = ["home", "search", "following", "settings"];
 var plain = (o) => o && typeof o === "object" && !Array.isArray(o) ? o : null;
 function titleRefOf(route) {
-  const a = plain(route?.params) ?? plain(route?.args);
-  return parseRef(a?.ref) ? a.ref : null;
+  for (const a of [plain(route?.params), plain(route?.args)]) if (parseRef(a?.ref)) return a.ref;
+  return null;
 }
+var isOpeningRoute = (route) => !!plain(plain(route)?.args) && Object.keys(route.args).length > 0;
 function resolveRoute(ctx = {}) {
   const route = plain(ctx.route) ?? {};
   const state = plain(ctx.state) ?? {};
@@ -1200,8 +1212,8 @@ function makeScreenApp() {
       const to = argOf(ev);
       return TAB_ROUTES.includes(to) ? { state: { route: to } } : null;
     },
-    back() {
-      return { route: { pop: true } };
+    back(ev) {
+      return isOpeningRoute(ev?.route) ? { go: { screen: { route: "main" } } } : { route: { pop: true } };
     },
     openTitle(ev) {
       const ref = argOf(ev);
@@ -1252,12 +1264,16 @@ function makeScreenApp() {
       unfollow(a.crId);
       return { ...toast("unfollowed", null, String(a.name ?? "")), state: { rev: nextRev(ev.state) } };
     },
+    // Kino merges the state key by key, so the season and "Ver los restantes" are kept under the title they belong to.
     titleSeason(ev) {
       const id = argOf(ev);
-      return id ? { state: { season: id.slice(0, 64), all: false } } : null;
+      const ref = titleRefOf(ev?.route);
+      return id && ref ? { state: { title: { ref, season: id.slice(0, 64), all: false } } } : null;
     },
-    titleEpisodesAll() {
-      return { state: { all: true } };
+    titleEpisodesAll(ev) {
+      const ref = titleRefOf(ev?.route);
+      const t2 = plain(ev?.state?.title);
+      return ref ? { state: { title: { ref, season: t2?.ref === ref ? t2.season : null, all: true } } } : null;
     }
   };
   async function screenEvent2(ev = {}) {
@@ -1290,13 +1306,13 @@ async function episodes(ref) {
   if (!r) throw kino.error("not_found", "Unknown ref: " + ref);
   if (r.kind === "movie") return { episodes: [] };
   const locale = contentLocale(kino.config);
-  const seasons = await seasonsOf(r.crId, locale);
+  const seasons = (await seasonsOf(r.crId, locale)).filter((s) => s.number >= 1 && s.number <= 999);
   const lists = await Promise.all(seasons.map((s) => api.episodes(s.id, locale).catch(() => [])));
   const episodes2 = [];
   seasons.forEach((s, i) => {
     for (const ep of lists[i]) {
       const e = mapEpisode(ep);
-      if (!Number.isInteger(e.number)) continue;
+      if (!Number.isInteger(e.number) || e.number < 1) continue;
       episodes2.push({ ...e, season: s.number });
     }
   });

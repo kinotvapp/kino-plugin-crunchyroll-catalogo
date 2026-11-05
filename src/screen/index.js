@@ -16,11 +16,17 @@ export const TAB_ROUTES = ["home", "search", "following", "settings"];
 
 const plain = (o) => (o && typeof o === "object" && !Array.isArray(o) ? o : null);
 
-/** The ref a title route carries in its params or args, when it is one of ours. */
+/**
+ * The ref a title route carries, when it is one of ours: in `params` when this screen pushed it, in `args` when a card on
+ * Kino's Home, a row or a notice opened the screen there (Kino then sends `params: {}`).
+ */
 export function titleRefOf(route) {
-  const a = plain(route?.params) ?? plain(route?.args);
-  return parseRef(a?.ref) ? a.ref : null;
+  for (const a of [plain(route?.params), plain(route?.args)]) if (parseRef(a?.ref)) return a.ref;
+  return null;
 }
+
+/** The screen opened straight on this route (a deep link): Kino keeps no route under it to pop back to. */
+const isOpeningRoute = (route) => !!plain(plain(route)?.args) && Object.keys(route.args).length > 0;
 
 /** `{ name, ref? }` to draw from Kino's route and the screen's state. */
 export function resolveRoute(ctx = {}) {
@@ -72,8 +78,9 @@ export function makeScreenApp() {
       const to = argOf(ev);
       return TAB_ROUTES.includes(to) ? { state: { route: to } } : null;
     },
-    back() {
-      return { route: { pop: true } };
+    back(ev) {
+      // Kino ignores pop on the first route: a title page opened from outside goes to Inicio instead.
+      return isOpeningRoute(ev?.route) ? { go: { screen: { route: "main" } } } : { route: { pop: true } };
     },
     openTitle(ev) {
       const ref = argOf(ev);
@@ -129,12 +136,16 @@ export function makeScreenApp() {
       unfollow(a.crId);
       return { ...toast("unfollowed", null, String(a.name ?? "")), state: { rev: nextRev(ev.state) } };
     },
+    // Kino merges the state key by key, so the season and "Ver los restantes" are kept under the title they belong to.
     titleSeason(ev) {
       const id = argOf(ev);
-      return id ? { state: { season: id.slice(0, 64), all: false } } : null;
+      const ref = titleRefOf(ev?.route);
+      return id && ref ? { state: { title: { ref, season: id.slice(0, 64), all: false } } } : null;
     },
-    titleEpisodesAll() {
-      return { state: { all: true } };
+    titleEpisodesAll(ev) {
+      const ref = titleRefOf(ev?.route);
+      const t = plain(ev?.state?.title);
+      return ref ? { state: { title: { ref, season: t?.ref === ref ? t.season : null, all: true } } } : null;
     },
   };
 

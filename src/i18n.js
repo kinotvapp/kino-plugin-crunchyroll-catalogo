@@ -55,6 +55,7 @@ export const SCREEN_TEXT = {
   close: ["Cerrar", "Close"],
   overview: ["Sinopsis", "Synopsis"],
   season: (n) => [`Temporada ${n}`, `Season ${n}`],
+  specials: ["Especiales", "Specials"],
   episode: (n) => [`Capítulo ${n}`, `Episode ${n}`],
   episodeRuntime: (m) => [`${m} min`, `${m} min`],
   seasonsCount: (n) => [n === 1 ? "1 temporada" : `${n} temporadas`, n === 1 ? "1 season" : `${n} seasons`],

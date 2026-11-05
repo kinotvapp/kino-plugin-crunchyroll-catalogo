@@ -76,7 +76,7 @@ function seasonsBlock(seasons, value) {
   return {
     type: "Column", key: "tseasons", gap: 8, children: [
       sectionTitle("seasons"),
-      { type: "Chips", key: "season", value, onChanged: "titleSeason", options: seasons.map((s) => ({ value: s.id, ...tw("season", "label", s.number) })) },
+      { type: "Chips", key: "season", value, onChanged: "titleSeason", options: seasons.map((s) => ({ value: s.id, ...(s.number >= 1 ? tw("season", "label", s.number) : tw("specials", "label")) })) },
     ],
   };
 }
@@ -150,7 +150,8 @@ export async function fichaBody({ ref, state = {} } = {}) {
   }
   const item = isSeries ? mapSeries(raw) : mapMovie(raw);
   const seasons = isSeries ? pickSeasons(seasonsRaw) : [];
-  const season = seasons.find((s) => s.id === state.season) ?? seasons[0] ?? null;
+  const mine = state.title && typeof state.title === "object" && state.title.ref === ref ? state.title : {};
+  const season = seasons.find((s) => s.id === mine.season) ?? seasons.find((s) => s.number >= 1) ?? seasons[0] ?? null;
 
   const [tmdbId, epResult] = await Promise.all([
     tmdbIdOf(item),
@@ -171,7 +172,7 @@ export async function fichaBody({ ref, state = {} } = {}) {
       .map((ep) => ({ ...mapEpisode(ep), premium: !!ep.is_premium_only }))
       .filter((e) => Number.isInteger(e.number))
       .sort((a, b) => a.number - b.number);
-    parts.push(episodesBlock(list, { failed: !!epResult.failed, all: state.all === true }));
+    parts.push(episodesBlock(list, { failed: !!epResult.failed, all: mine.all === true }));
   }
   const similar = (Array.isArray(similarRaw) ? similarRaw : []).map(mapAny).filter((s) => s && s.ref !== item.ref).slice(0, SIMILAR_MAX);
   if (similar.length) parts.push(similarBlock(similar));

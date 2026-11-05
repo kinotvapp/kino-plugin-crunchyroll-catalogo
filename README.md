@@ -30,8 +30,10 @@ Everything is Crunchyroll's API. TMDB (Kino's built-in `kino.tmdb`) is used for 
 - **Siguiendo.** "Sigues N de 10 series", one card per series (poster, name, latest episode, "Nuevo", Marcar como visto,
   Ver ficha, Dejar de seguir with a confirmation), Marcar todo como visto, and the button that turns the notices on.
 - **Title page** (a pushed route, so Back returns). Backdrop, name, year and seasons, Buscar dónde verlo, Seguir (series), genres,
-  synopsis, season chips (one per season number: a dub is not a season of its own), the first 30 episodes with "Ver los
-  restantes" (up to 80), and similar titles. Every card in the screen, a card on Kino's own Home (`open.screen`) and a notice
+  synopsis, season chips (one per season number: a dub is not a season of its own; season 0 is "Especiales", left out of
+  Kino's own episode list, which reads seasons 1..999), the first 30 episodes with "Ver los
+  restantes" (up to 80), and similar titles. The chosen season is kept per title. Opened from outside the screen, Back goes to
+  Inicio. Every card in the screen, a card on Kino's own Home (`open.screen`) and a notice
   (`go.screen`) open it.
 - **Ajustes** (a button of the bar). Kino's settings form: catalog language, what to show, rows on Kino's Home.
 
@@ -47,7 +49,7 @@ Everything is Crunchyroll's API. TMDB (Kino's built-in `kino.tmdb`) is used for 
 
 **`episodes`** ("Avisar de capítulos nuevos", every 360 min, options 60 / 180 / 360 / 720 / 1440, `runOn: "preferPhone"`). Off
 until the person turns it on (Seguir and "Activar los avisos" ask Kino with `enableJob`). Each run checks 4 followed series
-(Kino allows a job 10 requests: the token and 2 per series), rotating through all of them; the first check of a series only takes
+(Kino allows a job 10 requests: the token and 2 per series), rotating through all of them, on each series' newest season in its original audio; the first check of a series only takes
 its baseline. A newer aired episode posts one notice in Kino's bell and shows the series in "Capítulos nuevos de tus series".
 
 ## Budgets and storage
