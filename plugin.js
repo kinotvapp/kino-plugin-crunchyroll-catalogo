@@ -1089,7 +1089,7 @@ function episodeRow(e, i) {
     crossAxisAlignment: "center",
     canRequestFocus: true,
     children: [
-      { type: "Image", key: "tei-" + i, width: 120, aspect: "16:9", fit: "cover", ...e.still ? { url: e.still } : {}, fallback: { type: "Skeleton", shape: "block", height: 64 } },
+      { type: "Image", key: "tei-" + i, width: 120, aspect: "16:9", fit: "cover", radius: "medium", ...e.still ? { url: e.still } : {}, fallback: { type: "Skeleton", shape: "block", height: 64 } },
       { type: "Column", flex: 1, gap: 4, children: [
         { type: "Text", bold: true, maxLines: 2, ...titleOf },
         ...parts.length ? [{ type: "Text", style: "caption", color: "muted", text: parts.map((p) => p[0]).join(" · "), textEn: parts.map((p) => p[1]).join(" · ") }] : [],
